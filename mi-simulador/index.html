@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Simulador de Super-Arcade</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Vinculacion link css -->
+    <link rel="stylesheet" href="css/style.css" />
+    <!-- Vinculacion link javascript -->
+    <script src="js/main.js" defer></script>
+</head>
+
+<body>
+    <h1 id="titulo">🎮Super-Arcade - Compra de retro juegos de PlayStation 2🎮</h1>
+    <p id="feedback-visual" class="feedback" aria-live="polite">
+        Agregá un juego desde el formulario, filtrá por nombre o eliminá ítems en pantalla.
+    </p>
+
+    <form id="form-juego">
+        <label for="input-nombre">Nombre del juego</label>
+        <input type="text" id="input-nombre" placeholder="Ej: Need for Speed Carbon" required />
+
+        <label for="input-precio">Precio ($)</label>
+        <input type="number" id="input-precio" placeholder="Ej: 3600" min="1" required />
+
+        <label for="input-stock">Stock</label>
+        <input type="number" id="input-stock" placeholder="Ej: 5" min="0" value="5" required />
+
+        <button type="submit" id="btn-agregar" class="btn">Agregar</button>
+    </form>
+
+    <label for="input-buscar">Buscar juego</label>
+    <input type="text" id="input-buscar" placeholder="Escribí un título para filtrar..." />
+
+    <div id="contenedor"></div>
+</body>
+
+</html>
