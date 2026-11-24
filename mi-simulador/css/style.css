@@ -34,6 +34,20 @@ h2 {
     color: #fecdd3;
 }
 
+.aviso-extra {
+    background: #091326;
+    border-left: 4px solid #38bdf8;
+    padding: 8px 14px;
+    border-radius: 6px;
+    color: #bae6fd;
+    font-size: 0.95rem;
+    margin-top: 8px;
+}
+
+.aviso-extra:empty {
+    display: none;
+}
+
 .panel-controles {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

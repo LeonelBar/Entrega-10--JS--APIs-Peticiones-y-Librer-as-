@@ -1,4 +1,5 @@
-const CLAVE_STORAGE_CATALOGO = "superArcade_catalogo_pe8";
+const CLAVE_STORAGE_CATALOGO = "superArcade_catalogo_pe9";
+const COTIZACION_REFERENCIA_ARS = 1450;
 
 // 1) APLICACIÓN DEFINICIÓN DE LA CLASE
 class Juego {
@@ -37,15 +38,7 @@ function guardarEnStorage(lista) {
     localStorage.setItem(CLAVE_STORAGE_CATALOGO, JSON.stringify(lista));
 }
 
-function cargarDesdeStorage() {
-    const guardado = localStorage.getItem(CLAVE_STORAGE_CATALOGO);
-    if (!guardado) {
-        const copiaInicial = [...catalogoInicial];
-        guardarEnStorage(copiaInicial);
-        return copiaInicial;
-    }
-
-    const datosParseados = JSON.parse(guardado);
+function rehidratarCatalogo(datosParseados) {
     const listaSegura = Array.isArray(datosParseados) ? datosParseados : catalogoInicial;
 
     // Rehidratamos cada objeto plano como instancia de Juego con destructuring y ??
@@ -61,6 +54,17 @@ function cargarDesdeStorage() {
     });
 }
 
+function cargarDesdeStorage() {
+    const guardado = localStorage.getItem(CLAVE_STORAGE_CATALOGO);
+    if (!guardado) {
+        const copiaInicial = [...catalogoInicial];
+        guardarEnStorage(copiaInicial);
+        return copiaInicial;
+    }
+
+    return rehidratarCatalogo(JSON.parse(guardado));
+}
+
 let catalogoSuperArcade = cargarDesdeStorage();
 
 // 3) SELECCIÓN DE ELEMENTOS DEL DOM
@@ -71,8 +75,9 @@ const inputStock = document.getElementById("input-stock");
 const inputBuscar = document.querySelector("#input-buscar");
 const contenedor = document.querySelector("#contenedor");
 const feedbackVisual = document.getElementById("feedback-visual");
+const avisoComplementario = document.getElementById("aviso-complementario");
 
-// 4) FEEDBACK VISUAL EN PANTALLA (sin el alert ni console.log) con ?. y ??
+// 4) FEEDBACK VISUAL EN PANTALLA (sin alert ni console.log) con ?. y ??
 function mostrarFeedback(mensaje, esAlerta = false) {
     feedbackVisual?.classList.toggle("alerta", esAlerta);
     if (feedbackVisual) {
@@ -80,7 +85,59 @@ function mostrarFeedback(mensaje, esAlerta = false) {
     }
 }
 
-// 5) RENDERIZADO DINÁMICO CON DESTRUCTURING Y OPERADOR TERNARIO
+function mostrarAvisoComplementario(mensaje) {
+    const destino = avisoComplementario ?? feedbackVisual;
+    if (destino) {
+        destino.textContent = mensaje;
+    }
+}
+
+// 5) PROMESA ASÍNCRONA DE CARGA DE CATÁLOGO CON SETTIMEOUT
+function obtenerCatalogoAsync(forzarError = false) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (forzarError) {
+                reject(new Error("No se pudo sincronizar el catálogo del simulador."));
+                return;
+            }
+
+            const guardado = localStorage.getItem(CLAVE_STORAGE_CATALOGO);
+            if (!guardado) {
+                const copiaInicial = [...catalogoInicial];
+                guardarEnStorage(copiaInicial);
+                resolve(copiaInicial);
+                return;
+            }
+
+            resolve(rehidratarCatalogo(JSON.parse(guardado)));
+        }, 900);
+    });
+}
+
+// 6) CONSUMO CON ASYNC / AWAIT + TRY / CATCH / FINALLY
+async function cargarCatalogoAsync(forzarError = false) {
+    let estadoCargaCerrado = false;
+    mostrarFeedback("⏳ Cargando productos del catálogo...");
+
+    try {
+        const juegosObtenidos = await obtenerCatalogoAsync(forzarError);
+        catalogoSuperArcade = juegosObtenidos;
+        actualizarVistaActual();
+        mostrarFeedback(`✔️ ${catalogoSuperArcade.length} productos cargados.`);
+    } catch (error) {
+        mostrarFeedback(
+            `⚠️ No se pudo procesar la operación (${error?.message ?? "error inesperado"}), intentá de nuevo.`,
+            true
+        );
+    } finally {
+        estadoCargaCerrado = true;
+        if (estadoCargaCerrado && contenedor && contenedor.children.length === 0) {
+            renderizarCatalogo(catalogoSuperArcade);
+        }
+    }
+}
+
+// 7) RENDERIZADO DINÁMICO CON DESTRUCTURING Y OPERADOR TERNARIO
 function renderizarCatalogo(listaJuegos) {
     if (!contenedor) return;
 
@@ -116,7 +173,7 @@ function renderizarCatalogo(listaJuegos) {
     asociarEventosTarjetas();
 }
 
-// 6) EVENTOS DE CADA TARJETA (Comprar / Eliminar) + PERSISTENCIA
+// 8) EVENTOS DE CADA TARJETA (Comprar / Eliminar) + PERSISTENCIA
 function asociarEventosTarjetas() {
     const botonesComprar = contenedor.querySelectorAll(".btn-comprar");
     botonesComprar.forEach((boton) => {
@@ -155,7 +212,7 @@ function asociarEventosTarjetas() {
     });
 }
 
-// 7) ACTUALIZAR VISTA RESPETANDO EL FILTRO ACTIVO
+// 9) ACTUALIZAR VISTA RESPETANDO EL FILTRO ACTIVO
 function actualizarVistaActual() {
     const termino = (inputBuscar?.value ?? "").trim().toLowerCase();
     const listaFiltrada = catalogoSuperArcade.filter(({ nombre }) =>
@@ -164,44 +221,50 @@ function actualizarVistaActual() {
     renderizarCatalogo(listaFiltrada);
 }
 
-// 8) EVENTO SUBMIT / CLICK PARA AGREGAR UN NUEVO JUEGO SIN RECARGAR + PERSISTENCIA
+// 10) EVENTO SUBMIT CON TRY / CATCH / FINALLY + PERSISTENCIA
 formJuego?.addEventListener("submit", (evento) => {
     evento.preventDefault();
 
-    const nombreLimpio = (inputNombre?.value ?? "").trim();
-    const precioNum = Number(inputPrecio?.value ?? 0);
-    const stockNum = Number(inputStock?.value ?? 0);
+    try {
+        const nombreLimpio = (inputNombre?.value ?? "").trim();
+        const precioNum = Number(inputPrecio?.value ?? 0);
+        const stockNum = Number(inputStock?.value ?? 0);
 
-    if (!nombreLimpio || precioNum <= 0) {
-        mostrarFeedback("Ingresá un nombre válido y un precio mayor a 0.", true);
-        return;
+        if (!nombreLimpio || Number.isNaN(precioNum) || precioNum <= 0) {
+            throw new Error("Ingresá un nombre válido y un precio mayor a 0.");
+        }
+
+        const nuevoId =
+            catalogoSuperArcade.length > 0
+                ? Math.max(...catalogoSuperArcade.map(({ id }) => id)) + 1
+                : 1;
+
+        const nuevoJuego = new Juego(nuevoId, nombreLimpio, precioNum, stockNum);
+        catalogoSuperArcade = [...catalogoSuperArcade, nuevoJuego];
+        guardarEnStorage(catalogoSuperArcade);
+
+        if (inputBuscar) {
+            inputBuscar.value = "";
+        }
+        renderizarCatalogo(catalogoSuperArcade);
+        mostrarFeedback(
+            `Se agregó "${nuevoJuego.nombre}" ($${nuevoJuego.precio}) y quedó guardado en localStorage.`
+        );
+    } catch (error) {
+        mostrarFeedback(
+            `⚠️ No se pudo procesar la operación (${error?.message ?? "intentá de nuevo"}).`,
+            true
+        );
+    } finally {
+        formJuego.reset();
+        if (inputStock) {
+            inputStock.value = "5";
+        }
+        inputNombre?.focus();
     }
-
-    const nuevoId =
-        catalogoSuperArcade.length > 0
-            ? Math.max(...catalogoSuperArcade.map(({ id }) => id)) + 1
-            : 1;
-
-    const nuevoJuego = new Juego(nuevoId, nombreLimpio, precioNum, stockNum);
-    catalogoSuperArcade = [...catalogoSuperArcade, nuevoJuego];
-    guardarEnStorage(catalogoSuperArcade);
-
-    if (inputBuscar) {
-        inputBuscar.value = "";
-    }
-    renderizarCatalogo(catalogoSuperArcade);
-    mostrarFeedback(
-        `Se agregó "${nuevoJuego.nombre}" ($${nuevoJuego.precio}) y quedó guardado en localStorage.`
-    );
-
-    formJuego.reset();
-    if (inputStock) {
-        inputStock.value = "5";
-    }
-    inputNombre?.focus();
 });
 
-// 9) EVENTO DE TECLADO PARA FILTRAR EN TIEMPO REAL
+// 11) EVENTO DE TECLADO PARA FILTRAR EN TIEMPO REAL
 inputBuscar?.addEventListener("keyup", () => {
     const termino = (inputBuscar?.value ?? "").trim().toLowerCase();
     const filtrados = catalogoSuperArcade.filter(({ nombre }) =>
@@ -216,5 +279,12 @@ inputBuscar?.addEventListener("keyup", () => {
     );
 });
 
-// Render inicial al cargar o recargar la página (F5)
+// 12) TEMPORIZADOR AL INGRESAR + CARGA ASÍNCRONA INICIAL
+setTimeout(() => {
+    mostrarAvisoComplementario(
+        `🔔 Cotización de referencia hoy: $${COTIZACION_REFERENCIA_ARS} ARS — ¡Catálogo PS2 listo!`
+    );
+}, 2500);
+
 renderizarCatalogo(catalogoSuperArcade);
+cargarCatalogoAsync(false);
