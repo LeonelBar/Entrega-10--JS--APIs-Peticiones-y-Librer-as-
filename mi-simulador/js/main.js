@@ -1,7 +1,8 @@
-const CLAVE_STORAGE_CATALOGO = "superArcade_catalogo_pe9";
+const CLAVE_STORAGE_CATALOGO = "superArcade_catalogo_pe10";
+const RUTA_CATALOGO_JSON = "./data.json";
 const COTIZACION_REFERENCIA_ARS = 1450;
 
-// 1) APLICACIÓN DEFINICIÓN DE LA CLASE
+// 1) DEFINICIÓN DE LA CLASE
 class Juego {
     constructor(id, nombre, precio, stock, imagen = "img/portada-default.jpg") {
         this.id = id;
@@ -25,23 +26,76 @@ class Juego {
     }
 }
 
-// 2) INSTANCIACIÓN Y CATÁLOGO INICIAL
-const juego1 = new Juego(1, "GTA San Andreas", 3500, 10, "img/gta-san-andreas.jpg");
-const juego2 = new Juego(2, "Resident Evil 4", 3000, 5, "img/re4.jpg");
-const juego3 = new Juego(3, "God of War II", 3200, 8, "img/gow2.jpg");
-const juego4 = new Juego(4, "Dragon Ball Z Budokai Tenkaichi 3", 3000, 12, "img/bt3.jpg");
-const juego5 = new Juego(5, "Gran Turismo 3", 3400, 6, "img/gt3.jpg");
+let catalogoSuperArcade = [];
 
-const catalogoInicial = [juego1, juego2, juego3, juego4, juego5];
+// 2) SELECCIÓN DE ELEMENTOS DEL DOM
+const formJuego = document.querySelector("#form-juego");
+const inputNombre = document.getElementById("input-nombre");
+const inputPrecio = document.getElementById("input-precio");
+const inputStock = document.getElementById("input-stock");
+const inputBuscar = document.querySelector("#input-buscar");
+const contenedor = document.querySelector("#contenedor");
+const estadoCarga = document.getElementById("estado-carga");
+const feedbackVisual = document.getElementById("feedback-visual");
+const avisoComplementario = document.getElementById("aviso-complementario");
 
+// 3) NOTIFICACIONES CON TOASTIFY + FEEDBACK EN EL DOM (sin alert, prompt ni console)
+function notificarToast(texto, tipo = "info") {
+    const colores = {
+        exito: "linear-gradient(135deg, #059669, #10b981)",
+        error: "linear-gradient(135deg, #be123c, #f43f5e)",
+        info: "linear-gradient(135deg, #1d4ed8, #0284c7)"
+    };
+
+    if (typeof Toastify === "function") {
+        Toastify({
+            text: texto,
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            stopOnFocus: true,
+            style: {
+                background: colores[tipo] ?? colores.info,
+                borderRadius: "8px",
+                fontWeight: "bold"
+            }
+        }).showToast();
+    }
+}
+
+function mostrarFeedback(mensaje, esAlerta = false, tipoToast = null) {
+    feedbackVisual?.classList.toggle("alerta", esAlerta);
+    if (feedbackVisual) {
+        feedbackVisual.textContent = mensaje ?? "Acción completada.";
+    }
+
+    const tipoFinal = tipoToast ?? (esAlerta ? "error" : "info");
+    if (mensaje) {
+        notificarToast(mensaje, tipoFinal);
+    }
+}
+
+function setEstadoCarga(texto) {
+    if (estadoCarga) {
+        estadoCarga.textContent = texto ?? "";
+    }
+}
+
+function mostrarAvisoComplementario(mensaje) {
+    const destino = avisoComplementario ?? feedbackVisual;
+    if (destino) {
+        destino.textContent = mensaje;
+    }
+}
+
+// 4) PERSISTENCIA EN LOCALSTORAGE + REHIDRATACIÓN
 function guardarEnStorage(lista) {
     localStorage.setItem(CLAVE_STORAGE_CATALOGO, JSON.stringify(lista));
 }
 
-function rehidratarCatalogo(datosParseados) {
-    const listaSegura = Array.isArray(datosParseados) ? datosParseados : catalogoInicial;
+function rehidratarCatalogo(datos) {
+    const listaSegura = Array.isArray(datos) ? datos : [];
 
-    // Rehidratamos cada objeto plano como instancia de Juego con destructuring y ??
     return listaSegura.map((item) => {
         const { id, nombre, precio, stock, imagen } = item ?? {};
         return new Juego(
@@ -54,90 +108,50 @@ function rehidratarCatalogo(datosParseados) {
     });
 }
 
-function cargarDesdeStorage() {
-    const guardado = localStorage.getItem(CLAVE_STORAGE_CATALOGO);
-    if (!guardado) {
-        const copiaInicial = [...catalogoInicial];
-        guardarEnStorage(copiaInicial);
-        return copiaInicial;
+// 5) PETICIÓN CON FETCH() A ./data.json + ASYNC / AWAIT + TRY / CATCH / FINALLY
+async function obtenerCatalogoDesdeJson(ruta = RUTA_CATALOGO_JSON) {
+    const respuesta = await fetch(ruta);
+    if (!respuesta.ok) {
+        throw new Error(`Error HTTP ${respuesta.status} al leer ${ruta}`);
     }
 
-    return rehidratarCatalogo(JSON.parse(guardado));
-}
-
-let catalogoSuperArcade = cargarDesdeStorage();
-
-// 3) SELECCIÓN DE ELEMENTOS DEL DOM
-const formJuego = document.querySelector("#form-juego");
-const inputNombre = document.getElementById("input-nombre");
-const inputPrecio = document.getElementById("input-precio");
-const inputStock = document.getElementById("input-stock");
-const inputBuscar = document.querySelector("#input-buscar");
-const contenedor = document.querySelector("#contenedor");
-const feedbackVisual = document.getElementById("feedback-visual");
-const avisoComplementario = document.getElementById("aviso-complementario");
-
-// 4) FEEDBACK VISUAL EN PANTALLA (sin alert ni console.log) con ?. y ??
-function mostrarFeedback(mensaje, esAlerta = false) {
-    feedbackVisual?.classList.toggle("alerta", esAlerta);
-    if (feedbackVisual) {
-        feedbackVisual.textContent = mensaje ?? "Acción completada.";
+    const datos = await respuesta.json();
+    if (!Array.isArray(datos)) {
+        throw new Error("El formato del JSON no corresponde a un listado de juegos.");
     }
+
+    return rehidratarCatalogo(datos);
 }
 
-function mostrarAvisoComplementario(mensaje) {
-    const destino = avisoComplementario ?? feedbackVisual;
-    if (destino) {
-        destino.textContent = mensaje;
-    }
-}
-
-// 5) PROMESA ASÍNCRONA DE CARGA DE CATÁLOGO CON SETTIMEOUT
-function obtenerCatalogoAsync(forzarError = false) {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            if (forzarError) {
-                reject(new Error("No se pudo sincronizar el catálogo del simulador."));
-                return;
-            }
-
-            const guardado = localStorage.getItem(CLAVE_STORAGE_CATALOGO);
-            if (!guardado) {
-                const copiaInicial = [...catalogoInicial];
-                guardarEnStorage(copiaInicial);
-                resolve(copiaInicial);
-                return;
-            }
-
-            resolve(rehidratarCatalogo(JSON.parse(guardado)));
-        }, 900);
-    });
-}
-
-// 6) CONSUMO CON ASYNC / AWAIT + TRY / CATCH / FINALLY
-async function cargarCatalogoAsync(forzarError = false) {
-    let estadoCargaCerrado = false;
-    mostrarFeedback("⏳ Cargando productos del catálogo...");
+async function inicializarCatalogo() {
+    setEstadoCarga("Cargando productos…");
+    mostrarFeedback("Cargando productos desde ./data.json...", false, "info");
 
     try {
-        const juegosObtenidos = await obtenerCatalogoAsync(forzarError);
-        catalogoSuperArcade = juegosObtenidos;
+        const guardadoLocal = localStorage.getItem(CLAVE_STORAGE_CATALOGO);
+
+        if (guardadoLocal) {
+            const parseado = JSON.parse(guardadoLocal);
+            catalogoSuperArcade = rehidratarCatalogo(parseado);
+        } else {
+            catalogoSuperArcade = await obtenerCatalogoDesdeJson(RUTA_CATALOGO_JSON);
+            guardarEnStorage(catalogoSuperArcade);
+        }
+
         actualizarVistaActual();
-        mostrarFeedback(`✔️ ${catalogoSuperArcade.length} productos cargados.`);
+        mostrarFeedback("Productos cargados con éxito", false, "exito");
     } catch (error) {
         mostrarFeedback(
-            `⚠️ No se pudo procesar la operación (${error?.message ?? "error inesperado"}), intentá de nuevo.`,
-            true
+            `No se pudieron cargar los productos (${error?.message ?? "error de red"}).`,
+            true,
+            "error"
         );
     } finally {
-        estadoCargaCerrado = true;
-        if (estadoCargaCerrado && contenedor && contenedor.children.length === 0) {
-            renderizarCatalogo(catalogoSuperArcade);
-        }
+        setEstadoCarga("");
     }
 }
 
-// 7) RENDERIZADO DINÁMICO CON DESTRUCTURING Y OPERADOR TERNARIO
+// 6) RENDERIZADO DINÁMICO CON DESTRUCTURING Y OPERADOR TERNARIO
 function renderizarCatalogo(listaJuegos) {
     if (!contenedor) return;
 
@@ -173,7 +187,7 @@ function renderizarCatalogo(listaJuegos) {
     asociarEventosTarjetas();
 }
 
-// 8) EVENTOS DE CADA TARJETA (Comprar / Eliminar) + PERSISTENCIA
+// 7) EVENTOS DE CADA TARJETA (Comprar / Eliminar) + PERSISTENCIA
 function asociarEventosTarjetas() {
     const botonesComprar = contenedor.querySelectorAll(".btn-comprar");
     botonesComprar.forEach((boton) => {
@@ -185,10 +199,16 @@ function asociarEventosTarjetas() {
                 guardarEnStorage(catalogoSuperArcade);
                 actualizarVistaActual();
                 mostrarFeedback(
-                    `Venta realizada: "${juegoEncontrado.nombre}". Stock restante: ${juegoEncontrado.stock}.`
+                    `Compra confirmada: "${juegoEncontrado.nombre}" (stock restante: ${juegoEncontrado.stock}).`,
+                    false,
+                    "exito"
                 );
             } else if (juegoEncontrado) {
-                mostrarFeedback(`Sin stock disponible para "${juegoEncontrado.nombre}".`, true);
+                mostrarFeedback(
+                    `Sin stock disponible para "${juegoEncontrado.nombre}".`,
+                    true,
+                    "error"
+                );
             }
         });
     });
@@ -205,14 +225,16 @@ function asociarEventosTarjetas() {
 
             if (juegoObjetivo) {
                 mostrarFeedback(
-                    `Se eliminó "${juegoObjetivo.nombre}" del catálogo y del localStorage.`
+                    `Se eliminó "${juegoObjetivo.nombre}" del catálogo.`,
+                    false,
+                    "info"
                 );
             }
         });
     });
 }
 
-// 9) ACTUALIZAR VISTA RESPETANDO EL FILTRO ACTIVO
+// 8) ACTUALIZAR VISTA RESPETANDO EL FILTRO ACTIVO
 function actualizarVistaActual() {
     const termino = (inputBuscar?.value ?? "").trim().toLowerCase();
     const listaFiltrada = catalogoSuperArcade.filter(({ nombre }) =>
@@ -221,7 +243,7 @@ function actualizarVistaActual() {
     renderizarCatalogo(listaFiltrada);
 }
 
-// 10) EVENTO SUBMIT CON TRY / CATCH / FINALLY + PERSISTENCIA
+// 9) EVENTO SUBMIT CON TRY / CATCH / FINALLY + PERSISTENCIA
 formJuego?.addEventListener("submit", (evento) => {
     evento.preventDefault();
 
@@ -248,12 +270,15 @@ formJuego?.addEventListener("submit", (evento) => {
         }
         renderizarCatalogo(catalogoSuperArcade);
         mostrarFeedback(
-            `Se agregó "${nuevoJuego.nombre}" ($${nuevoJuego.precio}) y quedó guardado en localStorage.`
+            `Se agregó "${nuevoJuego.nombre}" ($${nuevoJuego.precio}) al catálogo.`,
+            false,
+            "exito"
         );
     } catch (error) {
         mostrarFeedback(
-            `⚠️ No se pudo procesar la operación (${error?.message ?? "intentá de nuevo"}).`,
-            true
+            `No se pudo completar la acción (${error?.message ?? "intentá de nuevo"}).`,
+            true,
+            "error"
         );
     } finally {
         formJuego.reset();
@@ -264,7 +289,7 @@ formJuego?.addEventListener("submit", (evento) => {
     }
 });
 
-// 11) EVENTO DE TECLADO PARA FILTRAR EN TIEMPO REAL
+// 10) EVENTO DE TECLADO PARA FILTRAR EN TIEMPO REAL
 inputBuscar?.addEventListener("keyup", () => {
     const termino = (inputBuscar?.value ?? "").trim().toLowerCase();
     const filtrados = catalogoSuperArcade.filter(({ nombre }) =>
@@ -272,19 +297,19 @@ inputBuscar?.addEventListener("keyup", () => {
     );
 
     renderizarCatalogo(filtrados);
-    mostrarFeedback(
-        termino
+    if (feedbackVisual) {
+        feedbackVisual.classList.remove("alerta");
+        feedbackVisual.textContent = termino
             ? `Filtrando por "${(inputBuscar?.value ?? "").trim()}": ${filtrados.length} juego(s).`
-            : `Mostrando todo el catálogo (${catalogoSuperArcade.length} juegos).`
-    );
+            : `Mostrando todo el catálogo (${catalogoSuperArcade.length} juegos).`;
+    }
 });
 
-// 12) TEMPORIZADOR AL INGRESAR + CARGA ASÍNCRONA INICIAL
+// 11) TEMPORIZADOR AL INGRESAR + CARGA INICIAL CON FETCH
 setTimeout(() => {
     mostrarAvisoComplementario(
         `🔔 Cotización de referencia hoy: $${COTIZACION_REFERENCIA_ARS} ARS — ¡Catálogo PS2 listo!`
     );
 }, 2500);
 
-renderizarCatalogo(catalogoSuperArcade);
-cargarCatalogoAsync(false);
+inicializarCatalogo();

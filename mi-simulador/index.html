@@ -5,14 +5,19 @@
     <meta charset="UTF-8">
     <title>Simulador de Super-Arcade</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Estilos Toastify vía CDN -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <!-- Vinculacion link css -->
     <link rel="stylesheet" href="css/style.css" />
+    <!-- Script Toastify vía CDN -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js" defer></script>
     <!-- Vinculacion link javascript -->
     <script src="js/main.js" defer></script>
 </head>
 
 <body>
     <h1 id="titulo">🎮Super-Arcade - Compra de retro juegos de PlayStation 2🎮</h1>
+    <p id="estado-carga" class="estado-carga" aria-live="polite"></p>
     <p id="feedback-visual" class="feedback" aria-live="polite">
         Agregá un juego desde el formulario, filtrá por nombre o eliminá ítems en pantalla.
     </p>

@@ -21,6 +21,20 @@ h2 {
     margin-top: 24px;
 }
 
+.estado-carga {
+    background: #0f1c36;
+    border-left: 4px solid #38bdf8;
+    padding: 8px 14px;
+    border-radius: 6px;
+    color: #7dd3fc;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.estado-carga:empty {
+    display: none;
+}
+
 .feedback {
     background: #0d172a;
     border-left: 4px solid #2563eb;
